@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset='utf-8'>
+  <meta http-equiv='X-UA-Compatible' content='IE=edge'>
+  <title>Mandelbrot Set Visualizer</title>
+  <meta name='viewport' content='width=device-width, initial-scale=1'>
+  <link rel='stylesheet' type='text/css' media='screen' href='main.css'>
+  <script src='main.js'></script>
+</head>
+
+<body>
+  <div class="container">
+    <canvas id="canvas" width="800" height="800"></canvas>
+    <div class="inputs">
+      <div class="center-inputs">
+        <div class="center-inputs__title">Center point</div>
+        <input type="text" id="centera" value="0" /><span class="label">Real part</span><br />
+        <input type="text" id="centerb" value="0" /><span class="label">Imaginary part</span><br />
+      </div>
+      <input type="text" id="radius" value="2" /><span class="label"></span>Radius</span><br />
+      <input type="text" id="iterations" value="100" /><span class="label"></span>Iterations</span><br />
+      <input type="button" value="Update" id="updateBtn" /><br />
+      <input type="button" value="Save as JPEG" id="saveBtn" /><br />
+      <div class="animate-inputs">
+        <div class="animate__title">Animate</div>
+        <input type="text" id="startRadius" value="1" /><span class="label">Starting radius</span><br />
+        <input type="text" id="finalRadius" value="0.001" /><span class="label">Final radius</span><br />
+        <input type="text" id="startIterations" value="100" /><span class="label">Starting iterations</span><br />
+        <input type="text" id="finalIterations" value="500"/><span class="label">Final iterations</span><br />
+        <input type="text" id="steps" value="20" /><span class="label">Steps</span><br />
+      </div>
+      <input type="checkbox" id="saveAsJpeg"/><span class="label">Save each frame as JPEG</span><br />
+      <input type="text" value="mandelbrot-animation" id="filename" /><span class="label">File name prefix</span><br />
+      <input type="button" value="Start" id="startBtn" /><br />
+    </div>
+    <div class="zoom-window" id="zoom">
+    </div>
+  </div>
+</body>
+
+</html>

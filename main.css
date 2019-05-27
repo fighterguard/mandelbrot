@@ -1,0 +1,44 @@
+.container {
+  display: flex;
+  flex-flow: row nowrap;
+  font-family: 'Roboto', Arial, sans-serif;
+  font-size: 14px;
+}
+
+.zoom-window {
+  display: none;
+  width: 10px;
+  height: 10px;
+  background: none;
+  border: 2px solid purple;
+  position: fixed;
+  z-index: 999;
+  top: 0;
+  left: 0;
+}
+
+.inputs {
+  margin: 50px;
+}
+
+.inputs input {
+  margin: 5px;
+}
+
+.center-inputs, .animate-inputs {
+  border: 1px solid black;
+  width: max-content;
+  padding-right: 5px;
+  margin-top: 10px;
+}
+
+.center-inputs__title, .animate__title {
+  margin: -10px 0 0 10px;
+  background: white;
+  width: max-content;
+  padding: 0 5px;
+}
+
+.label {
+  padding: 0 5px;
+}
