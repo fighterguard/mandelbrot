@@ -1,5 +1,15 @@
 document.onreadystatechange = () => {
   if (document.readyState === 'complete') {
+
+    //declarations
+
+    const startingColors = [
+      {red: 255, green: 255, blue: 255}, // white
+      {red: 0, green: 0, blue: 0}, //black
+      {red: 0, green: 0, blue: 255}, // blue
+      {red: 0, green: 255, blue: 255}, //cyan
+      {red: 255, green: 255, blue: 255}, // white
+    ];
     const canvas = document.querySelector("#canvas");
     const ctx = canvas.getContext("2d");
     const zoomWindow = document.getElementById("zoom");
@@ -14,13 +24,18 @@ document.onreadystatechange = () => {
       fi: document.getElementById("finalIterations"),
       sj: document.getElementById("saveAsJpeg"),
       fn: document.getElementById("filename"),
-      st: document.getElementById("steps")
+      st: document.getElementById("steps"),
+      rv: document.getElementById("redValue"),
+      gv: document.getElementById("greenValue"),
+      bv: document.getElementById("blueValue"),
+      tc: document.getElementById("totalColors")
     };
     const height = 800;
     const width = 800;
-    const totalColors = 200;
-    const colorTable = [];
     const imagePadding = "00000";
+    let totalColors = 200;
+    let colorTable = [];
+    let selectedColorIndex;
     let imageCounter = 1;
     let centerComplexClick;
     let centerPixelClick;
@@ -33,10 +48,18 @@ document.onreadystatechange = () => {
     let zoomFactor;
     let detailFactor;
     let animating = false;
+
+
+    //function calls
+
     calculateRanges();
     calculateFactors();
     calculateColors();
+    fillColorList();
     window.requestAnimationFrame(renderNext);
+
+
+    //event listeners
 
     canvas.onmousedown = (ev) => {
       centerComplexClick = translatePixelToComplex(ev.clientX, ev.clientY);
@@ -88,6 +111,85 @@ document.onreadystatechange = () => {
       window.requestAnimationFrame(renderNextAnimation);
     });
 
+    document.querySelectorAll(".slider").forEach((e) => {
+      e.oninput = (ev) => {
+        applyPreviewColor();
+      }
+    });
+
+    document.getElementById("updateColorBtn").addEventListener("click", (ev) => {
+      startingColors[selectedColorIndex].red = parseInt(inputs.rv.value);
+      startingColors[selectedColorIndex].green = parseInt(inputs.gv.value);
+      startingColors[selectedColorIndex].blue = parseInt(inputs.bv.value);
+      fillColorList();
+    });
+
+    document.getElementById("removeColorBtn").addEventListener("click", (ev) => {
+      startingColors.splice(selectedColorIndex, 1);
+      fillColorList();
+    });
+
+    document.getElementById("addColorBtn").addEventListener("click", (ev) => {
+      startingColors.push({
+        red: parseInt(inputs.rv.value),
+        green: parseInt(inputs.gv.value),
+        blue: parseInt(inputs.bv.value)
+      });
+      fillColorList();
+    });
+
+    document.getElementById("applyColorBtn").addEventListener("click", (ev) => {
+      calculateColors();
+    });
+
+
+    //methods
+
+    function fillColorList(){
+      document.getElementById("colorListContainer").innerHTML = "";
+      document.getElementById("updateColorBtn").disabled = true;
+      document.getElementById("removeColorBtn").disabled = true;
+      let gradientText = "linear-gradient(to right";
+      for (let i = 0; i < startingColors.length; i++) {
+        const radio = document.createElement("input");
+        radio.id = `color${i}`;
+        radio.setAttribute("type", "radio");
+        radio.setAttribute("name", "selectedColor");
+        radio.setAttribute("value", i);
+        radio.setAttribute("class", "colorSelector");
+        radio.onchange = radioChanged;
+        const colorDiv = document.createElement("div");
+        colorDiv.style.height = "20px";
+        colorDiv.style.width = "20px";
+        colorDiv.style.border = "1px solid black";
+        colorDiv.style.backgroundColor = `rgb(${startingColors[i].red}, ${startingColors[i].green}, ${startingColors[i].blue})`;
+        const parentDiv = document.createElement("div");
+        parentDiv.style.display = "flex";
+        parentDiv.style.flexFlow = "row nowrap";
+        parentDiv.appendChild(radio);
+        parentDiv.appendChild(colorDiv);
+        document.getElementById("colorListContainer").appendChild(parentDiv);
+        gradientText = `${gradientText}, rgb(${startingColors[i].red}, ${startingColors[i].green}, ${startingColors[i].blue})`;
+      }
+      gradientText = `${gradientText})`;
+      document.getElementById("gradientSample").style.backgroundImage = gradientText;
+    }
+
+    function radioChanged(ev){
+      const index = ev.target.value;
+      inputs.rv.value = startingColors[index].red;
+      inputs.gv.value = startingColors[index].green;
+      inputs.bv.value = startingColors[index].blue;
+      selectedColorIndex = index;
+      document.getElementById("updateColorBtn").disabled = false;
+      document.getElementById("removeColorBtn").disabled = false;
+      applyPreviewColor();
+    }
+
+    function applyPreviewColor(){
+      document.getElementById("colorPreview").style.backgroundColor = `rgb(${inputs.rv.value}, ${inputs.gv.value}, ${inputs.bv.value})`;
+    }
+
     function drawZoomWindow(ev) {
       const xDist = ev.clientX - centerPixelClick.x;
       const yDist = ev.clientY - centerPixelClick.y;
@@ -98,12 +200,6 @@ document.onreadystatechange = () => {
       zoomWindow.style.height = `${radius * 2}px`;
       zoomWindow.style.borderRadius = `${radius}px`;
       zoomWindow.style.display = "block";
-    }
-
-    function calculateColors() {
-      for (let i = 0; i < totalColors; i++) {
-        colorTable.push(calculateColorValue(i, totalColors));
-      }
     }
 
     function calculateFactors() {
@@ -242,51 +338,38 @@ document.onreadystatechange = () => {
       }
     }
 
-    function calculateColorValue(completed, total) {
+    function calculateProportionFactor(a,b,n) {
+      return (b - a)/n;
+    }
+
+    function calculateColors() {
+      colorTable = [];
+      totalColors = parseInt(inputs.tc.value);
+      const segmentSize = totalColors / (startingColors.length-1);
+      const proportionFactors = [];
+      for (let i = 1; i < startingColors.length; i++) {
+        proportionFactors.push(
+          {
+            r: calculateProportionFactor(startingColors[i-1].red, startingColors[i].red, segmentSize),
+            g: calculateProportionFactor(startingColors[i-1].green, startingColors[i].green, segmentSize),
+            b: calculateProportionFactor(startingColors[i-1].blue, startingColors[i].blue, segmentSize)
+          }
+        );
+      }
+      for (let i = 0; i < totalColors; i++) {
+        colorTable.push(calculateColorValue(i, proportionFactors, segmentSize));
+      }
+    }
+
+    function calculateColorValue(completed, proportionFactors, segmentSize) {
       let red;
       let green;
       let blue;
-      const segmentSize = total / 7;
       const currentSegment = Math.floor(completed / segmentSize);
       const segmentPortion = completed % segmentSize;
-      const proportion = Math.floor(segmentPortion * 255 / segmentSize);
-      switch (currentSegment) {
-        case 0:
-          red = 255;
-          green = 255 - proportion;
-          blue = 255 - proportion;
-          break;
-        case 1:
-          red = 255;
-          green = proportion;
-          blue = 0;
-          break;
-        case 2:
-          red = 255 - proportion;
-          green = 255;
-          blue = 0;
-          break;
-        case 3:
-          red = 0;
-          green = 255;
-          blue = proportion;
-          break;
-        case 4:
-          red = 0;
-          green = 255 - proportion;
-          blue = 255;
-          break;
-        case 5:
-          red = 0;
-          green = 0;
-          blue = 255 - proportion;
-          break;
-        case 6:
-          red = proportion;
-          green = proportion;
-          blue = proportion;
-          break;
-      }
+      red = Math.round(startingColors[currentSegment].red + segmentPortion * proportionFactors[currentSegment].r);
+      green = Math.round(startingColors[currentSegment].green + segmentPortion * proportionFactors[currentSegment].g);
+      blue = Math.round(startingColors[currentSegment].blue + segmentPortion * proportionFactors[currentSegment].b);
       return [red, green, blue];
     }
 

@@ -14,8 +14,8 @@
   <div class="container">
     <canvas id="canvas" width="800" height="800"></canvas>
     <div class="inputs">
-      <div class="center-inputs">
-        <div class="center-inputs__title">Center point</div>
+      <div class="center-inputs box">
+        <div class="title">Center point</div>
         <input type="text" id="centera" value="0" /><span class="label">Real part</span><br />
         <input type="text" id="centerb" value="0" /><span class="label">Imaginary part</span><br />
       </div>
@@ -23,8 +23,8 @@
       <input type="text" id="iterations" value="100" /><span class="label"></span>Iterations</span><br />
       <input type="button" value="Update" id="updateBtn" /><br />
       <input type="button" value="Save as JPEG" id="saveBtn" /><br />
-      <div class="animate-inputs">
-        <div class="animate__title">Animate</div>
+      <div class="animate-inputs box">
+        <div class="title">Animate</div>
         <input type="text" id="startRadius" value="1" /><span class="label">Starting radius</span><br />
         <input type="text" id="finalRadius" value="0.001" /><span class="label">Final radius</span><br />
         <input type="text" id="startIterations" value="100" /><span class="label">Starting iterations</span><br />
@@ -34,6 +34,27 @@
       <input type="checkbox" id="saveAsJpeg"/><span class="label">Save each frame as JPEG</span><br />
       <input type="text" value="mandelbrot-animation" id="filename" /><span class="label">File name prefix</span><br />
       <input type="button" value="Start" id="startBtn" /><br />
+    </div>
+    <div class="palette-editor">
+        <div class="palette__color-picker box">
+          <div class="title">Color picker</div>
+          <input class="slider" step="1" type="range" id="redValue" min="0" max="255" value="0" /><span class="label">Red</span><br />
+          <input class="slider" step="1" type="range" id="greenValue" min="0" max="255" value="0" /><span class="label">Green</span><br />
+          <input class="slider" step="1" type="range" id="blueValue" min="0" max="255" value="0" /><span class="label">Blue</span><br />
+          <div id="colorPreview" class="color-preview"></div>
+          <input type="button" value="Update" id="updateColorBtn" disabled /><br />
+          <input type="button" value="Add new" id="addColorBtn" /><br />
+          <input type="button" value="Remove" id="removeColorBtn" disabled /><br />
+        </div>
+        <div class="color-list box">
+            <div class="title">Color list</div>
+            <div id="colorListContainer">
+
+            </div>
+        </div>
+        <input type="text" id="totalColors" value="200"/><span class="label">Total colors</span><br />
+        <input type="button" value="Apply" id="applyColorBtn" /><br />
+        <div class="gradient-sample" id="gradientSample"></div>
     </div>
     <div class="zoom-window" id="zoom">
     </div>
