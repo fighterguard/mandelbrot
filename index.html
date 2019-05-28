@@ -7,6 +7,7 @@
   <title>Mandelbrot Set Visualizer</title>
   <meta name='viewport' content='width=device-width, initial-scale=1'>
   <link rel='stylesheet' type='text/css' media='screen' href='main.css'>
+  <script src='worker.js'></script>
   <script src='main.js'></script>
 </head>
 
@@ -34,6 +35,9 @@
       <input type="checkbox" id="saveAsJpeg"/><span class="label">Save each frame as JPEG</span><br />
       <input type="text" value="mandelbrot-animation" id="filename" /><span class="label">File name prefix</span><br />
       <input type="button" value="Start" id="startBtn" /><br />
+      <div class="progress-bar">
+        <div class="progress-bar__filler" id="progressBarFiller"></div>
+      </div>
     </div>
     <div class="palette-editor">
         <div class="palette__color-picker box">

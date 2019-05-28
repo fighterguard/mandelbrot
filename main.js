@@ -5,14 +5,17 @@ document.onreadystatechange = () => {
 
     const startingColors = [
       {red: 255, green: 255, blue: 255}, // white
-      {red: 0, green: 0, blue: 0}, //black
+      {red: 255, green: 0, blue: 0}, // red
+      {red: 255, green: 255, blue: 0}, // yellow
+      {red: 0, green: 255, blue: 0}, // green
       {red: 0, green: 0, blue: 255}, // blue
-      {red: 0, green: 255, blue: 255}, //cyan
+      {red: 0, green: 0, blue: 0}, //black
       {red: 255, green: 255, blue: 255}, // white
     ];
     const canvas = document.querySelector("#canvas");
-    const ctx = canvas.getContext("2d");
+    ctx = canvas.getContext("bitmaprenderer");
     const zoomWindow = document.getElementById("zoom");
+    const progressFiller = document.getElementById("progressBarFiller");
     const inputs = {
       ca: document.getElementById("centera"),
       cb: document.getElementById("centerb"),
@@ -45,9 +48,21 @@ document.onreadystatechange = () => {
     let maxRangeX = 2;
     let minRangeY = -2;
     let maxRangeY = 2;
+    let xScale;
+    let xFactor;
+    let yScale;
+    let yFactor;
     let zoomFactor;
     let detailFactor;
     let animating = false;
+
+    let blob = new Blob([
+      "onmessage = function(ev){\
+          " + workerFunction.toString() + "\
+          workerFunction(ev);}"
+    ]);
+    let blobURL = window.URL.createObjectURL(blob);
+    let worker = new Worker(blobURL);
 
 
     //function calls
@@ -56,14 +71,34 @@ document.onreadystatechange = () => {
     calculateFactors();
     calculateColors();
     fillColorList();
-    window.requestAnimationFrame(renderNext);
+    renderOffScreen();
 
 
     //event listeners
 
+    worker.addEventListener("message", (ev) => {
+      if(ev.data.type === "done"){
+        ctx.transferFromImageBitmap(ev.data.bitmap);
+        if(animating){
+          if(inputs.sj.checked){
+            saveAsJPEG();
+          }
+          renderNextAnimation();
+        }
+      }
+      if(ev.data.type === "progress"){
+        progressFiller.style.width = `${ev.data.completed}%`;
+      }
+    });
+
     canvas.onmousedown = (ev) => {
       centerComplexClick = translatePixelToComplex(ev.clientX, ev.clientY);
       centerPixelClick = { x: ev.clientX, y: ev.clientY };
+      zoomWindow.style.width = `0px`;
+      zoomWindow.style.height = `0px`;
+      zoomWindow.style.left = `${centerPixelClick.x}px`;
+      zoomWindow.style.top = `${centerPixelClick.y}px`;
+      zoomWindow.style.display = "none";
       canvas.addEventListener("mousemove", drawZoomWindow);
     }
 
@@ -90,13 +125,12 @@ document.onreadystatechange = () => {
       inputs.cb.value = centerComplexClick.y;
       calculateRanges();
       calculateFactors();
-      window.requestAnimationFrame(renderNext);
     };
 
     document.getElementById("updateBtn").addEventListener("click", (ev) => {
       calculateRanges();
       calculateFactors();
-      window.requestAnimationFrame(renderNext);
+      renderOffScreen();
     });
 
     document.getElementById("saveBtn").addEventListener("click", (ev) => {
@@ -108,7 +142,7 @@ document.onreadystatechange = () => {
       inputs.i.value = inputs.si.value;
       calculateZoomAndDetailFactors();
       animating = true;
-      window.requestAnimationFrame(renderNextAnimation);
+      renderNextAnimation();
     });
 
     document.querySelectorAll(".slider").forEach((e) => {
@@ -232,21 +266,6 @@ document.onreadystatechange = () => {
       };
     }
 
-    function discardCardioidAndBulb(c) {
-      const p = Math.sqrt(Math.pow(c.real - (1 / 4), 2) + Math.pow(c.imaginary, 2));
-      if (c.real <= p - (2 * p * p) + 1 / 4) {
-        return true;
-      }
-      if (Math.pow(c.real + 1, 2) + (Math.pow(c.imaginary, 2)) <= (1 / 16)) {
-        return true;
-      }
-      return false;
-    }
-
-    function renderNext() {
-      renderFrame(totalIterations);
-    }
-
     function renderNextAnimation() {
       let iterations = parseInt(inputs.i.value);
       let radius = parseFloat(inputs.r.value);
@@ -260,10 +279,28 @@ document.onreadystatechange = () => {
         inputs.r.value = radius;
         calculateRanges();
         calculateFactors();
-        renderFrame(iterations);
+        renderOffScreen();
       }else{
         animating = false;
       }
+    }
+
+    function renderOffScreen(){
+      let vars = {
+        width,
+        height,
+        totalIterations,
+        colorTable,
+        totalColors,
+        factors: {
+          xFactor,
+          xScale,
+          yFactor,
+          yScale
+        }
+      };
+      const offCanvas = new OffscreenCanvas(800, 800);
+      worker.postMessage({canvas: offCanvas, vars}, [offCanvas]);
     }
 
     function saveAsJPEG() {
@@ -281,61 +318,6 @@ document.onreadystatechange = () => {
       document.body.appendChild(dlLink);
       dlLink.click();
       document.body.removeChild(dlLink);
-    }
-
-    function renderFrame(m) {
-      let printed = true;
-      let entered = false;
-      for (let i = 0; i < width; i++) {
-        for (let j = 0; j < height; j++) {
-          const coords = translatePixelToComplex(i, j);
-          const x = coords.x;
-          const y = coords.y;
-          const iteratee = complex(x, y);
-          let outOfBounds = false;
-          fillColor = "rgba(0,0,0)";
-          let z = complex(0, 0);
-          let completedIterations;
-          for (let k = 0; k < m; k++) {
-            if (discardCardioidAndBulb(iteratee)) {
-              break;
-            }
-            let result = iterate(z, iteratee);
-            completedIterations = k + 1;
-            if (Math.pow(result.real, 2) + Math.pow(result.imaginary, 2) >= 4) {
-              outOfBounds = true;
-              break;
-            }
-            z = result;
-          }
-          if (outOfBounds) {
-            const colorValues = colorTable[Math.floor((completedIterations - 1) % totalColors)];
-            fillColor = `rgba(${colorValues[0]},${colorValues[1]},${colorValues[2]}, 1)`;
-          }
-          ctx.fillStyle = fillColor;
-          ctx.fillRect(i, j, 1, 1);
-        }
-        const percentageCompleted = (i + 1) * 100 / width;
-        const modulo = Math.floor(percentageCompleted % 5);
-        if (modulo === 0) {
-          entered = true;
-        } else {
-          entered = false;
-        }
-        if (entered && !printed) {
-          console.log(`${percentageCompleted}%`);
-          printed = true;
-        }
-        if (!entered) {
-          printed = false;
-        }
-      }
-      if(animating){
-        if(inputs.sj.checked){
-          saveAsJPEG();
-        }
-        window.requestAnimationFrame(renderNextAnimation);
-      }
     }
 
     function calculateProportionFactor(a,b,n) {
@@ -371,33 +353,6 @@ document.onreadystatechange = () => {
       green = Math.round(startingColors[currentSegment].green + segmentPortion * proportionFactors[currentSegment].g);
       blue = Math.round(startingColors[currentSegment].blue + segmentPortion * proportionFactors[currentSegment].b);
       return [red, green, blue];
-    }
-
-    function complex(a, b) {
-      const real = a;
-      const imaginary = b;
-      return {
-        real: a,
-        imaginary: b,
-        add: (c) => {
-          const r = real + c.real;
-          const im = imaginary + c.imaginary;
-          return complex(r, im);
-        },
-        multiply: (c) => {
-          const f = real * c.real;
-          const o = real * c.imaginary;
-          const i = imaginary * c.real;
-          const l = imaginary * c.imaginary;
-          const r = f - l;
-          const im = o + i;
-          return complex(r, im);
-        }
-      }
-    }
-
-    function iterate(z, c) {
-      return z.multiply(z).add(c);
     }
   }
 };

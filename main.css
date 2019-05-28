@@ -1,3 +1,7 @@
+body {
+  margin: 0;
+}
+
 .container {
   display: flex;
   flex-flow: row nowrap;
@@ -55,4 +59,17 @@
   border: 1px solid black;
   height: 50px;
   width: 400px;
+}
+
+.progress-bar {
+  width: 200px;
+  height: 30px;
+  border: 1px solid black;
+  text-align: center;
+}
+
+.progress-bar__filler {
+  width: 0;
+  height: 100%;
+  background-color: darkgreen;
 }
