@@ -18,3 +18,7 @@ Ver. 0.2
 Ver. 0.3
 - Added a worker to offload the iteration and rendering process out of the main thread
 - Added a progress bar
+
+Ver 0.4
+- Added multithreaded rendering. 4 workers are used for rendering, increasing performance by 2 to 3 times
+- Made many impromevents and fixed many bugs in the zoom function
