@@ -12,10 +12,16 @@ document.onreadystatechange = () => {
       {red: 0, green: 0, blue: 0}, //black
       {red: 255, green: 255, blue: 255}, // white
     ];
+
     const canvas = document.querySelector("#canvas");
-    ctx = canvas.getContext("bitmaprenderer");
+    ctx = canvas.getContext("2d");
+    const bufferCanvas = document.createElement("canvas");
+    bufferCtx = bufferCanvas.getContext("bitmaprenderer");
+    const canvasContainer = document.getElementById("canvasContainer");
     const zoomWindow = document.getElementById("zoom");
     const progressFiller = document.getElementById("progressBarFiller");
+    const workers = [];
+    const imagePadding = "00000";
     const inputs = {
       ca: document.getElementById("centera"),
       cb: document.getElementById("centerb"),
@@ -33,42 +39,64 @@ document.onreadystatechange = () => {
       bv: document.getElementById("blueValue"),
       tc: document.getElementById("totalColors")
     };
-    const height = 800;
-    const width = 800;
-    const imagePadding = "00000";
+    const quadrants = [
+      {
+        x: 400,
+        y: 0
+      },
+      {
+        x: 0,
+        y: 0
+      },
+      {
+        x: 0,
+        y: 400
+      },
+      {
+        x: 400,
+        y: 400
+      }
+    ];
+
     let totalColors = 200;
     let colorTable = [];
     let selectedColorIndex;
     let imageCounter = 1;
     let centerComplexClick;
     let centerPixelClick;
-    let radiusClick;
-    let totalIterations = 100;
-    let minRangeX = -2;
-    let maxRangeX = 2;
-    let minRangeY = -2;
-    let maxRangeY = 2;
-    let xScale;
-    let xFactor;
-    let yScale;
-    let yFactor;
-    let zoomFactor;
+    let radiusClick = 2;
     let detailFactor;
+    let currentRanges;
+    let currentFactors;
     let animating = false;
+    let currentProgress = 0;
+    let renderComplete = 0;
+    let startTime;
+    let endTime;
 
-    let blob = new Blob([
-      "onmessage = function(ev){\
-          " + workerFunction.toString() + "\
-          workerFunction(ev);}"
-    ]);
-    let blobURL = window.URL.createObjectURL(blob);
-    let worker = new Worker(blobURL);
+    for (let i = 0; i < 4; i++) {
+      workers.push(createWorker());
+      // workers[0].addEventListener("message", (ev) => {
+      //   if(ev.data.type === "done"){
+      //     bufferCtx.transferFromImageBitmap(ev.data.bitmap);
+      //     ctx.drawImage(bufferCanvas, 0, 0);
+      //     if(animating){
+      //       if(inputs.sj.checked){
+      //         saveAsJPEG();
+      //       }
+      //       renderNextAnimation();
+      //     }
+      //   }
+      //   if(ev.data.type === "progress"){
+      //     progressFiller.style.width = `${ev.data.completed}%`;
+      //   }
+      // });
+    }
 
 
     //function calls
 
-    calculateRanges();
-    calculateFactors();
+    calculateCurrentValues();
     calculateColors();
     fillColorList();
     renderOffScreen();
@@ -76,60 +104,40 @@ document.onreadystatechange = () => {
 
     //event listeners
 
-    worker.addEventListener("message", (ev) => {
-      if(ev.data.type === "done"){
-        ctx.transferFromImageBitmap(ev.data.bitmap);
-        if(animating){
-          if(inputs.sj.checked){
-            saveAsJPEG();
-          }
-          renderNextAnimation();
-        }
-      }
-      if(ev.data.type === "progress"){
-        progressFiller.style.width = `${ev.data.completed}%`;
-      }
-    });
-
-    canvas.onmousedown = (ev) => {
+    canvasContainer.onmousedown = (ev) => {
       centerComplexClick = translatePixelToComplex(ev.clientX, ev.clientY);
       centerPixelClick = { x: ev.clientX, y: ev.clientY };
-      zoomWindow.style.width = `0px`;
-      zoomWindow.style.height = `0px`;
       zoomWindow.style.left = `${centerPixelClick.x}px`;
       zoomWindow.style.top = `${centerPixelClick.y}px`;
-      zoomWindow.style.display = "none";
-      canvas.addEventListener("mousemove", drawZoomWindow);
+      //zoomWindow.style.display = "none";
+      canvasContainer.addEventListener("mousemove", drawZoomWindow);
     }
 
-    canvas.onmouseleave = (ev) => {
-      canvas.removeEventListener("mousemove", drawZoomWindow);
-      zoomWindow.style.display = "none";
+    canvasContainer.onmouseleave = (ev) => {
+      canvasContainer.removeEventListener("mousemove", drawZoomWindow);
     }
 
-    canvas.onmouseenter = (ev) => {
+    canvasContainer.onmouseenter = (ev) => {
       if (ev.buttons === 1 && centerPixelClick) {
-        canvas.addEventListener("mousemove", drawZoomWindow);
+        canvasContainer.addEventListener("mousemove", drawZoomWindow);
       }
     }
 
-    canvas.onmouseup = (ev) => {
-      canvas.removeEventListener("mousemove", drawZoomWindow);
-      zoomWindow.style.display = "none";
+    canvasContainer.onmouseup = (ev) => {
+      canvasContainer.removeEventListener("mousemove", drawZoomWindow);
+      //zoomWindow.style.display = "none";
       const coords = translatePixelToComplex(ev.clientX, ev.clientY);
       const xDist = centerComplexClick.x - coords.x;
       const yDist = centerComplexClick.y - coords.y;
-      radiusClick = Math.sqrt(Math.pow(xDist, 2) + Math.pow(yDist, 2));
-      inputs.r.value = radiusClick;
       inputs.ca.value = centerComplexClick.x;
       inputs.cb.value = centerComplexClick.y;
-      calculateRanges();
-      calculateFactors();
+      radiusClick = Math.sqrt(Math.pow(xDist, 2) + Math.pow(yDist, 2));
+      if(radiusClick > 0){
+        inputs.r.value = radiusClick;
+      }
     };
 
     document.getElementById("updateBtn").addEventListener("click", (ev) => {
-      calculateRanges();
-      calculateFactors();
       renderOffScreen();
     });
 
@@ -179,6 +187,39 @@ document.onreadystatechange = () => {
 
     //methods
 
+    function createWorker(){
+      let blob = new Blob([
+        "onmessage = function(ev){\
+            " + workerFunction.toString() + "\
+            workerFunction(ev);}"
+      ]);
+      let blobURL = window.URL.createObjectURL(blob);
+      let worker = new Worker(blobURL);
+      worker.addEventListener("message", (ev) => {
+        if(ev.data.type === "done"){
+          bufferCtx.transferFromImageBitmap(ev.data.bitmap);
+          ctx.drawImage(bufferCanvas, quadrants[ev.data.id].x, quadrants[ev.data.id].y);
+          renderComplete++;
+          if(renderComplete === 4){
+            endTime = performance.now();
+            console.log(`Rendering finished after ${endTime - startTime} milliseconds`);
+            calculateCurrentValues();
+            if(animating){
+              if(inputs.sj.checked){
+                saveAsJPEG();
+              }
+              renderNextAnimation();
+            }
+          }
+        }
+        if(ev.data.type === "progress"){
+          currentProgress += 0.25;
+          progressFiller.style.width = `${currentProgress}%`;
+        }
+      });
+      return worker;
+    }
+
     function fillColorList(){
       document.getElementById("colorListContainer").innerHTML = "";
       document.getElementById("updateColorBtn").disabled = true;
@@ -227,31 +268,70 @@ document.onreadystatechange = () => {
     function drawZoomWindow(ev) {
       const xDist = ev.clientX - centerPixelClick.x;
       const yDist = ev.clientY - centerPixelClick.y;
-      const radius = Math.round(Math.sqrt(Math.pow(xDist, 2) + Math.pow(yDist, 2))) - 10;
-      zoomWindow.style.left = `${centerPixelClick.x - radius}px`;
-      zoomWindow.style.top = `${centerPixelClick.y - radius}px`;
+      const radius = Math.round(Math.sqrt(Math.pow(xDist, 2) + Math.pow(yDist, 2)));    
+      zoomWindow.style.left = `${centerPixelClick.x}px`;
+      zoomWindow.style.top = `${centerPixelClick.y}px`;
       zoomWindow.style.width = `${radius * 2}px`;
       zoomWindow.style.height = `${radius * 2}px`;
-      zoomWindow.style.borderRadius = `${radius}px`;
       zoomWindow.style.display = "block";
     }
 
-    function calculateFactors() {
-      xFactor = width / (maxRangeX - minRangeX);
-      xScale = ((xFactor * (maxRangeX + minRangeX)) - width) / 2;
-      yFactor = (-1 * height) / (maxRangeY - minRangeY);
-      yScale = ((yFactor * (maxRangeY + minRangeY)) - height) / 2;
+    function calculateCurrentValues(){
+      currentRanges = calculateRanges();
+      currentFactors = calculateFactors(currentRanges, 800, 800);
+    }
+
+    function calculateFactors(ranges, width, height) {
+      const factors = {};
+      factors.xFactor = width / (ranges.maxRangeX - ranges.minRangeX);
+      factors.xScale = ((factors.xFactor * (ranges.maxRangeX + ranges.minRangeX)) - width) / 2;
+      factors.yFactor = (-1 * height) / (ranges.maxRangeY - ranges.minRangeY);
+      factors.yScale = ((factors.yFactor * (ranges.maxRangeY + ranges.minRangeY)) - height) / 2;
+      return factors;
     }
 
     function calculateRanges() {
+      const ranges = {};
       const ca = parseFloat(inputs.ca.value);
       const cb = parseFloat(inputs.cb.value);
       const r = parseFloat(inputs.r.value);
-      minRangeX = ca - r;
-      maxRangeX = ca + r;
-      minRangeY = cb - r;
-      maxRangeY = cb + r;
-      totalIterations = parseInt(inputs.i.value);
+      ranges.minRangeX = ca - r;
+      ranges.maxRangeX = ca + r;
+      ranges.minRangeY = cb - r;
+      ranges.maxRangeY = cb + r;
+      return ranges;
+    }
+
+    function calculateQuadrantRanges(){
+      const ranges = [];
+      const ca = parseFloat(inputs.ca.value);
+      const cb = parseFloat(inputs.cb.value);
+      const r = parseFloat(inputs.r.value);
+      ranges.push({
+        minRangeX: ca,
+        maxRangeX: ca + r,
+        minRangeY: cb,
+        maxRangeY: cb + r
+      });
+      ranges.push({
+        minRangeX: ca - r,
+        maxRangeX: ca,
+        minRangeY: cb,
+        maxRangeY: cb + r
+      });
+      ranges.push({
+        minRangeX: ca - r,
+        maxRangeX: ca,
+        minRangeY: cb - r,
+        maxRangeY: cb
+      });
+      ranges.push({
+        minRangeX: ca,
+        maxRangeX: ca + r,
+        minRangeY: cb - r,
+        maxRangeY: cb
+      });
+      return ranges;
     }
 
     function calculateZoomAndDetailFactors(){
@@ -261,8 +341,8 @@ document.onreadystatechange = () => {
 
     function translatePixelToComplex(x, y) {
       return {
-        x: (x + xScale) / xFactor,
-        y: (y + yScale) / yFactor
+        x: (x + currentFactors.xScale) / currentFactors.xFactor,
+        y: (y + currentFactors.yScale) / currentFactors.yFactor
       };
     }
 
@@ -277,8 +357,6 @@ document.onreadystatechange = () => {
         }
         inputs.i.value = iterations;
         inputs.r.value = radius;
-        calculateRanges();
-        calculateFactors();
         renderOffScreen();
       }else{
         animating = false;
@@ -286,21 +364,29 @@ document.onreadystatechange = () => {
     }
 
     function renderOffScreen(){
-      let vars = {
-        width,
-        height,
-        totalIterations,
-        colorTable,
-        totalColors,
-        factors: {
-          xFactor,
-          xScale,
-          yFactor,
-          yScale
-        }
-      };
-      const offCanvas = new OffscreenCanvas(800, 800);
-      worker.postMessage({canvas: offCanvas, vars}, [offCanvas]);
+      startTime = performance.now();
+      renderComplete = 0;
+      currentProgress = 0;
+      zoomWindow.width = 800;
+      zoomWindow.height = 800;
+      zoomWindow.style.display = "none";
+      const ranges = calculateQuadrantRanges();
+      const width = 400;
+      const height = 400;
+      const totalIterations = parseInt(inputs.i.value);
+      for (let i = 0; i < ranges.length; i++) {
+        const factors = calculateFactors(ranges[i], width, height);
+        const vars = {
+          width,
+          height,
+          totalIterations,
+          colorTable,
+          totalColors,
+          factors
+        };
+        const offCanvas = new OffscreenCanvas(width, height);
+        workers[i].postMessage({canvas: offCanvas, vars, id: i}, [offCanvas]);
+      }
     }
 
     function saveAsJPEG() {
@@ -348,7 +434,7 @@ document.onreadystatechange = () => {
       let green;
       let blue;
       const currentSegment = Math.floor(completed / segmentSize);
-      const segmentPortion = completed % segmentSize;
+      const segmentPortion = completed - currentSegment * segmentSize;
       red = Math.round(startingColors[currentSegment].red + segmentPortion * proportionFactors[currentSegment].r);
       green = Math.round(startingColors[currentSegment].green + segmentPortion * proportionFactors[currentSegment].g);
       blue = Math.round(startingColors[currentSegment].blue + segmentPortion * proportionFactors[currentSegment].b);

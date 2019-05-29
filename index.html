@@ -13,7 +13,11 @@
 
 <body>
   <div class="container">
-    <canvas id="canvas" width="800" height="800"></canvas>
+    <div id="canvasContainer">
+      <canvas id="canvas" width="800" height="800"></canvas>
+      <div class="zoom-window" id="zoom">
+    </div>
+    </div>
     <div class="inputs">
       <div class="center-inputs box">
         <div class="title">Center point</div>
@@ -59,8 +63,6 @@
         <input type="text" id="totalColors" value="200"/><span class="label">Total colors</span><br />
         <input type="button" value="Apply" id="applyColorBtn" /><br />
         <div class="gradient-sample" id="gradientSample"></div>
-    </div>
-    <div class="zoom-window" id="zoom">
     </div>
   </div>
 </body>

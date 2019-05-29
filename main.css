@@ -9,13 +9,21 @@ body {
   font-size: 14px;
 }
 
+#canvasContainer {
+  min-width: 800px;
+  min-height: 800px;
+  overflow: hidden;
+  position: relative;
+}
+
 .zoom-window {
   display: none;
-  width: 10px;
-  height: 10px;
+  width: 800px;
+  height: 800px;
+  transform: translate(-50%, -50%);
   background: none;
   border: 2px solid purple;
-  position: fixed;
+  position: absolute;
   z-index: 999;
   top: 0;
   left: 0;

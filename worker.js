@@ -40,14 +40,14 @@ function workerFunction(ev) {
       entered = false;
     }
     if (entered && !printed) {
-      self.postMessage({type: "progress", completed: percentageCompleted});
+      self.postMessage({type: "progress"});
       printed = true;
     }
     if (!entered) {
       printed = false;
     }
   }
-  self.postMessage({type: "done", bitmap: canvas.transferToImageBitmap()});
+  self.postMessage({type: "done", bitmap: canvas.transferToImageBitmap(), id: ev.data.id});
 
   function complex(a, b) {
     const real = a;
